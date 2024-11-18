@@ -1,134 +1,172 @@
 package star
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
+	"strings"
 )
 
-// Context is passed to Funcs
+// Context is the context in which a command is run.
+// It provides parsed parameters, input and output streams, and a go context.Context
 type Context struct {
 	context.Context
-
-	// In is stdin
-	In io.Reader
-	// Out is stdout
-	Out io.Writer
-	// Err is stderr
-	Err io.Writer
-
+	Params   map[Symbol][]any
+	Env      map[string]string
+	StdIn    *bufio.Reader
+	StdOut   *bufio.Writer
+	StdErr   *bufio.Writer
 	CalledAs string
-	Args     []string
+	Extra    []string
 
-	values map[string]value
+	self *Command
 }
 
-func (c *Context) Uint64(x string) uint64 {
-	return getValue[uint64](c.values, x)
-}
-
-func (c *Context) Int64(x string) int64 {
-	return getValue[int64](c.values, x)
-}
-
-func (c *Context) String(x string) string {
-	return getValue[string](c.values, x)
-}
-
-func (c *Context) Time(x string) string {
-	return getValue[string](c.values, x)
-}
-
-func (c *Context) StringSlice(x string) []string {
-	return getValue[[]string](c.values, x)
-}
-
-func (c *Context) Bytes(x string) []byte {
-	return getValue[[]byte](c.values, x)
-}
-
-func (c *Context) MaybeUint64(x string) (uint64, bool) {
-	return getMaybeValue[uint64](c.values, x)
-}
-
-func (c *Context) MaybeInt64(x string) (int64, bool) {
-	return getMaybeValue[int64](c.values, x)
-}
-
-func (c *Context) MaybeString(x string) (string, bool) {
-	return getMaybeValue[string](c.values, x)
-}
-
-func (c *Context) WithValue(k, v interface{}) *Context {
-	c2 := *c
-	c2.Context = context.WithValue(c.Context, k, v)
-	return &c2
-}
-
-func (c *Context) env() Env {
-	return Env{
-		In:  c.In,
-		Out: c.Out,
-		Err: c.Err,
+func (c Context) Printf(format string, a ...any) {
+	_, err := fmt.Fprintf(c.StdOut, format, a...)
+	if err != nil {
+		panic(err)
 	}
 }
 
-// V is a generic function which retrieves values from a Context
-// The V stands for Value
-func V[T any](ctx *Context, x string) T {
-	return getValue[T](ctx.values, x)
+func (c Context) Param(x Symbol) (any, bool) {
+	if !c.self.HasParam(x) {
+		panic(fmt.Sprintf("Command does not take param %q", x))
+	}
+	v, exists := c.Params[x]
+	return v, exists
 }
 
-// M is a generic function which retrieve maybe values from a Context
-// The M stands for Maybe.
-func M[T any](ctx *Context, x string) (T, bool) {
-	return getMaybeValue[T](ctx.values, x)
+func Run(ctx context.Context, cmd Command, env map[string]string, calledAs string, args []string, stdin *bufio.Reader, stdout *bufio.Writer, stderr *bufio.Writer) error {
+	params := make(map[Symbol][]any)
+	args, err := ParseFlags(params, cmd.Flags, args)
+	if err != nil {
+		stderr.WriteString(cmd.Doc(calledAs))
+		return err
+	}
+	args, err = ParsePos(params, cmd.Pos, args)
+	if err != nil {
+		stderr.WriteString(cmd.Doc(calledAs))
+		return err
+	}
+	if err := checkParams(params, cmd.Flags, cmd.Pos); err != nil {
+		stderr.WriteString(cmd.Doc(calledAs))
+		return err
+	}
+	defer stdout.Flush()
+	defer stderr.Flush()
+	return cmd.F(Context{
+		Context:  ctx,
+		StdOut:   stdout,
+		StdIn:    stdin,
+		StdErr:   stderr,
+		Params:   params,
+		Extra:    args,
+		CalledAs: calledAs,
+
+		self: &cmd,
+	})
 }
 
-type value struct {
-	Type        Type
-	IsRequired  bool
-	WasProvided bool
-	X           interface{}
-}
-
-func getValue[T any](vs map[string]value, x string) T {
-	v, exists := vs[x]
-	if !exists {
-		panic(fmt.Sprintf("asked star.Context for a value which does not exist. This is a bug. You must specify a Flag or Arg for %q", x))
-	}
-	if err := checkType(v.Type, v.Type); err != nil {
-		panic(err.Error())
-	}
-	return v.X.(T)
-}
-
-func getMaybeValue[T any](vs map[string]value, x string) (T, bool) {
-	var zero T
-	v, exists := vs[x]
-	if !exists {
-		return zero, false
-	}
-	if err := checkType(v.Type, v.Type); err != nil {
-		panic(err.Error())
-	}
-	if v.X == nil {
-		// no default
-		return zero, false
-	}
-	if v.IsRequired {
-		panic(fmt.Sprintf("don't use Maybe* methods for required parameter %q", x))
-	}
-	return v.X.(T), v.WasProvided
-}
-
-func checkType(pty, rty Type) error {
-	if !pty.AssignableTo(rty) {
-		return errTypeMismatch(pty, rty)
+func checkParams(valueMap map[Symbol][]any, flags, pos []IParam) error {
+	for _, params := range [][]IParam{flags, pos} {
+		for _, param := range params {
+			vals := valueMap[param.name()]
+			if len(vals) < 1 && !param.isRepeated() {
+				return fmt.Errorf("missing value for parameter %q", param.name())
+			}
+			if len(vals) > 1 && !param.isRepeated() {
+				return fmt.Errorf("multiple values provided for parameter %q", param.name())
+			}
+		}
 	}
 	return nil
 }
 
-func errTypeMismatch(pty, rty Type) error {
-	return fmt.Errorf("requested data of type %T but parameter is type %v", rty, pty)
+// ParsePos parses positional arguments
+func ParsePos(dst map[Symbol][]any, params []IParam, args []string) (rest []string, err error) {
+	for _, param := range params {
+		val, rest, err := parseOnePos(param, args)
+		if err != nil {
+			return nil, err
+		}
+		dst[param.name()] = append(dst[param.name()], val)
+		args = rest
+	}
+	return args, nil
+}
+
+func parseOnePos(p IParam, args []string) (vals any, rest []string, err error) {
+	for i := 0; i < len(args); i++ {
+		if isFlag(args[i]) {
+			// ignore flags
+			rest = append(rest, args[i])
+			i += 2
+			continue
+		}
+		val, err := p.parse(args[i])
+		if err != nil {
+			return nil, nil, err
+		}
+		return val, append(rest, args[i+1:]...), nil
+	}
+	return nil, args, fmt.Errorf("no args left to parse for positional argument %q", p.name())
+}
+
+const flagPrefix = "--"
+
+func isFlag(x string) bool {
+	return strings.HasPrefix(x, flagPrefix)
+}
+
+// ParseFlags takes a slice of args, and parses paramaeters in the list of flags.
+// ParseFlags writes values to dst.
+func ParseFlags(dst map[Symbol][]any, flags []IParam, args []string) (rest []string, err error) {
+	flagIndex := make(map[Symbol]IParam)
+	for _, flag := range flags {
+		flagIndex[flag.name()] = flag
+	}
+
+	for len(args) > 0 {
+		arg := args[0]
+		if k, yes := strings.CutPrefix(arg, flagPrefix); yes {
+			sym := Symbol(k)
+			param := flagIndex[sym]
+			if _, exists := flagIndex[sym]; exists {
+				// TODO handle equals
+				if len(args) < 2 {
+					return nil, fmt.Errorf("arg named but not provided for %q", k)
+				}
+				v, err := param.parse(args[1])
+				if err != nil {
+					return nil, err
+				}
+				dst[sym] = append(dst[sym], v)
+				args = args[2:]
+				continue
+			}
+		}
+		args = args[1:]
+		rest = append(rest, arg)
+	}
+
+	for name, param := range flagIndex {
+		if len(dst[name]) == 0 && !param.isRepeated() {
+			if param.hasDefault() {
+				val, err := param.makeDefault()
+				if err != nil {
+					return rest, err
+				}
+				dst[name] = append(dst[name], val)
+				return rest, nil
+			}
+			return nil, fmt.Errorf("missing flag %q", param.name())
+		}
+	}
+	return rest, nil
+}
+
+// ParseString is a parser for strings, it is the identity function on strings, and never errors.
+func ParseString(x string) (string, error) {
+	return x, nil
 }

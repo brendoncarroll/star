@@ -1,14 +1,15 @@
 package teststar
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/brendoncarroll/star"
-
 	"github.com/stretchr/testify/require"
+
+	"go.brendoncarroll.net/star"
 )
 
 // OutIs runs the command with in as an input string, and checks that the output is out.
@@ -28,8 +29,10 @@ func OutContainsString(t testing.TB, c *star.Command, args []string, expect stri
 
 // run runs c with cmdStr
 func run(t testing.TB, c *star.Command, args []string) (stdout []byte, stderr []byte) {
+	ctx := context.Background()
 	var inbuf, outbuf, errbuf bytes.Buffer
-	err := star.Execute(context.Background(), c, star.Env{In: &inbuf, Out: &outbuf, Err: &errbuf}, "TEST", args)
+	env := map[string]string{}
+	err := star.Run(ctx, *c, env, t.Name(), args, bufio.NewReader(&inbuf), bufio.NewWriter(&outbuf), bufio.NewWriter(&errbuf))
 	require.NoError(t, err)
 	return outbuf.Bytes(), errbuf.Bytes()
 }

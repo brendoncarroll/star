@@ -3,44 +3,47 @@ package main
 import (
 	"fmt"
 
-	"github.com/brendoncarroll/star"
+	"go.brendoncarroll.net/star"
 )
 
 func main() {
-	star.Main("crud", rootCmd)
+	star.Main(rootCmd)
 }
 
-var idArg = star.NewPos[string]("id", "", true)
+var idArg = star.Param[string]{
+	Name:  "id",
+	Parse: star.ParseString,
+}
 
-var rootCmd = star.NewParent("an example CLI app", nil, map[string]*star.Command{
-	"create": &star.Command{
-		Short: "creates a new entity",
-		F: func(ctx *star.Context) error {
-			_, err := fmt.Fprintln(ctx.Out, "CREATE")
+var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.Symbol]star.Command{
+	"create": {
+		Metadata: star.Metadata{Short: "creates a new entity"},
+		F: func(ctx star.Context) error {
+			_, err := fmt.Fprintln(ctx.StdOut, "CREATE")
 			return err
 		},
 	},
-	"read": &star.Command{
-		Short: "reads the value of an entity",
-		Pos:   []star.Pos{idArg},
-		F: func(ctx *star.Context) error {
-			_, err := fmt.Fprintln(ctx.Out, "READ "+ctx.String("id"))
+	"read": {
+		Metadata: star.Metadata{Short: "reads the value of an entity"},
+		Pos:      []star.IParam{idArg},
+		F: func(ctx star.Context) error {
+			_, err := fmt.Fprintln(ctx.StdOut, "READ "+idArg.Load(ctx))
 			return err
 		},
 	},
-	"update": &star.Command{
-		Short: "update the value of an entity",
-		Pos:   []star.Pos{idArg},
-		F: func(ctx *star.Context) error {
-			_, err := fmt.Fprintln(ctx.Out, "UPDATE "+ctx.String("id"))
+	"update": {
+		Metadata: star.Metadata{Short: "update the value of an entity"},
+		Pos:      []star.IParam{idArg},
+		F: func(ctx star.Context) error {
+			_, err := fmt.Fprintln(ctx.StdOut, "UPDATE "+idArg.Load(ctx))
 			return err
 		},
 	},
-	"delete": &star.Command{
-		Short: "delete an entity by id",
-		Pos:   []star.Pos{idArg},
-		F: func(ctx *star.Context) error {
-			_, err := fmt.Fprintln(ctx.Out, "DELETE "+ctx.String("id"))
+	"delete": {
+		Metadata: star.Metadata{Short: "delete an entity by id"},
+		Pos:      []star.IParam{idArg},
+		F: func(ctx star.Context) error {
+			_, err := fmt.Fprintln(ctx.StdOut, "DELETE "+idArg.Load(ctx))
 			return err
 		},
 	},

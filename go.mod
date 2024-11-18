@@ -1,17 +1,20 @@
-module github.com/brendoncarroll/star
+module go.brendoncarroll.net/star
 
-go 1.18
+go 1.23
 
 require (
-	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.0
-	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b
+	github.com/stretchr/testify v1.8.4
+	go.brendoncarroll.net/exp v0.0.0-20241118183830-280772e567eb
+	go.brendoncarroll.net/stdctx v0.0.0-20241118190518-40d09f4d11e7
+	go.uber.org/zap v1.27.0
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

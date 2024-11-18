@@ -4,157 +4,168 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/slices"
+	"go.brendoncarroll.net/exp/slices2"
 )
 
-// Func is the type of functions which can be run as commands
-type Func = func(ctx *Context) error
+// Symbol is the name of a parameter
+type Symbol string
 
-// Command is a Func and associated metadata.
-type Command struct {
-	// Short is a short doc string
-	Short string
-
-	// Pos is a slice of specifications for positional arguments
-	Pos []Pos
-	// Flags are the flags the command is expecting
-	Flags []Flag
-
-	// F is the function to run
-	F Func
+type Param[T any] struct {
+	// Name identifies the parameter
+	Name Symbol
+	// Default is used as input to Parse if the parameter was not specified
+	Default *string
+	// Repeated means the parameter can be specified multiple times
+	Repeated bool
+	// Parse is called to convert strings
+	Parse func(string) (T, error)
 }
 
-func (c *Command) Clone() *Command {
-	c2 := *c
-	c2.Flags = slices.Clone(c2.Flags)
-	c2.Pos = slices.Clone(c2.Pos)
-	return &c2
-}
+func (Param[T]) isParam() {}
 
-func (c *Command) Usage() string {
-	return usage(c.Pos)
-}
-
-// usage
-func usage(poss []Pos) string {
-	sb := strings.Builder{}
-	for i, a := range poss {
-		if i > 0 {
-			sb.WriteString(" ")
-		}
-		if !a.IsRequired {
-			sb.WriteString("[")
-		}
-		sb.WriteString(a.Name)
-		if a.IsRepeated {
-			sb.WriteString(" ...")
-		}
-		if !a.IsRequired {
-			sb.WriteString("]")
-		}
+// Load acceses a parameter from the context
+func (p Param[T]) Load(c Context) T {
+	if !c.self.HasParam(p.Name) {
+		panic(fmt.Sprintf("Command does not take param %q", p.Name))
 	}
-	return sb.String()
+	return pickLast(c.Params[p.Name]).(T)
 }
 
-func describeUsage(calledAs string, poss []Pos) string {
-	sb := strings.Builder{}
-	sb.WriteString("Usage:\n  ")
-	sb.WriteString(calledAs)
-	sb.WriteString("  ")
-	sb.WriteString(usage(poss))
-	sb.WriteString("\n\n")
-	return sb.String()
-}
-
-func describeFlags(flags []Flag) string {
-	sb := strings.Builder{}
-	sb.WriteString("Flags:\n")
-	for _, f := range flags {
-		sb.WriteString("\t")
-		sb.WriteString(f.Name)
-		sb.WriteString(" :")
-		sb.WriteString(fmt.Sprint(f.Type))
+// LoadOpt acceses an optional parameter from the context
+func (p Param[T]) LoadOpt(c Context) (T, bool) {
+	if !c.self.HasParam(p.Name) {
+		panic(fmt.Sprintf("Command does not take param %q", p.Name))
 	}
-	return sb.String()
-}
-
-func describeChildren(children map[string]*Command) string {
-	sb := &strings.Builder{}
-	sb.WriteString("Available Commands:\n")
-	for name, child := range children {
-		fmt.Fprintf(sb, "  %-10s %s\n", name, child.Short)
-	}
-	return sb.String()
-}
-
-func parentLong(calledAs string, short string, pos []Pos, children map[string]*Command) string {
-	sb := &strings.Builder{}
-	sb.WriteString(short)
-	sb.WriteString("\n\n")
-
-	sb.WriteString(calledAs)
-	sb.WriteString(" ")
-	sb.WriteString(usage(pos))
-	sb.WriteString("\n\n")
-
-	sb.WriteString(describeChildren(children))
-
-	return sb.String()
-}
-
-// NewParent constructs a parent command grouping several child commans
-func NewParent(short string, flags []Flag, children map[string]*Command) *Command {
-	pos := []Pos{NewPos[string]("command", "", false)}
-	return &Command{
-		Short: short,
-		Flags: flags,
-		Pos:   pos,
-		F: func(ctx *Context) error {
-			name, ok := ctx.MaybeString("command")
-			if !ok {
-				_, err := fmt.Fprintln(ctx.Out, parentLong(ctx.CalledAs, short, pos, children))
-				return err
-			}
-			childCmd, exists := children[name]
-			if !exists {
-				return fmt.Errorf("%s has no sub-command %s", ctx.CalledAs, name)
-			}
-			return Execute(ctx.Context, childCmd, ctx.env(), name, ctx.Args)
-		},
+	if y, exists := c.Params[p.Name]; exists && len(y) > 0 {
+		return pickLast(y).(T), exists
+	} else {
+		var zero T
+		return zero, false
 	}
 }
 
-// func WrapHelp(cmd *Command) *Command {
-// 	return cmd
-// }
+// LoadAll returns a slice containing every specified value for the flag
+func (p Param[T]) LoadAll(c Context) []T {
+	if !c.self.HasParam(p.Name) {
+		panic(fmt.Sprintf("Command does not take param %q", p.Name))
+	}
+	if !p.Repeated {
+		panic(fmt.Sprintf("LoadAll on non-repated Param %q", p.Name))
+	}
+	return slices2.Map(c.Params[p.Name], func(x any) T {
+		return x.(T)
+	})
+}
 
-// PreExec returns a function x which calls preF before x.
-func PreExec(x Func, preF func(ctx *Context) (*Context, error)) Func {
-	return func(ctx *Context) error {
-		var err error
-		ctx, err = preF(ctx)
+func (p Param[T]) name() Symbol {
+	return p.Name
+}
+
+func (p Param[T]) parse(x string) (any, error) {
+	return p.Parse(x)
+}
+
+func (p Param[T]) hasDefault() bool {
+	return p.Default != nil
+}
+
+func (p Param[T]) defaultString() string {
+	return *p.Default
+}
+
+func (p Param[T]) makeDefault() (any, error) {
+	return p.parse(*p.Default)
+}
+
+func (p Param[T]) parseVar(xs []string) (any, error) {
+	var ret []T
+	for _, x := range xs {
+		y, err := p.Parse(x)
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("parsing vararg %v: %w", x, err)
 		}
-		return x(ctx)
+		ret = append(ret, y)
 	}
+	return ret, nil
 }
 
-// PostExec returns a function which calls postF after x.
-// PostExec always runs after x, even if x returns an error.
-// x's error is prioritized in the return value
-func PostExec(x Func, postF func(ctx *Context) error) Func {
-	return func(ctx *Context) (retErr error) {
-		defer func() {
-			err := postF(ctx)
-			if retErr == nil {
-				retErr = err
-			}
-		}()
-		return x(ctx)
-	}
+func (p Param[T]) isRepeated() bool {
+	return p.Repeated
 }
 
-func PrePostExec(x Func, preF func(ctx *Context) (*Context, error), postF func(ctx *Context) error) Func {
-	return PostExec(PreExec(x, preF), postF)
+type IParam interface {
+	isParam()
+	name() Symbol
+	parse(string) (any, error)
+	parseVar([]string) (any, error)
+	hasDefault() bool
+	defaultString() string
+	makeDefault() (any, error)
+	isRepeated() bool
+}
+
+func NewString(name Symbol) Param[string] {
+	return Param[string]{Name: name, Parse: ParseString}
+}
+
+type Metadata struct {
+	Short string
+	// Tags for grouping by category
+	Tags []string
+}
+
+type Command struct {
+	Flags []IParam
+	Pos   []IParam
+	F     func(c Context) error
+	Metadata
+}
+
+func (c Command) HasParam(x Symbol) bool {
+	for i := range c.Pos {
+		if c.Pos[i].name() == x {
+			return true
+		}
+	}
+	for i := range c.Flags {
+		if c.Flags[i].name() == x {
+			return true
+		}
+	}
+	return false
+}
+
+func (c Command) Doc(calledAs string) string {
+	sb := &strings.Builder{}
+	fmt.Fprintf(sb, "%s ", calledAs)
+	for _, pos := range c.Pos {
+		if pos.hasDefault() {
+			fmt.Fprintf(sb, "[%s]", pos.name())
+		} else {
+			fmt.Fprintf(sb, "<%s>", pos.name())
+		}
+	}
+	sb.WriteString("\nFLAGS:\n")
+	for _, flag := range c.Flags {
+		fmt.Fprintf(sb, "  --%-20s", flag.name())
+		if flag.isRepeated() {
+			sb.WriteString("  (repeated)")
+		}
+		if !flag.isRepeated() && !flag.hasDefault() {
+			sb.WriteString("  (required)")
+		}
+		if flag.hasDefault() {
+			fmt.Fprintf(sb, "  (default=%q)", flag.defaultString())
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+func pickLast[E any, S ~[]E](x S) E {
+	return x[len(x)-1]
+}
+
+func Ptr[T any](x T) *T {
+	return &x
 }
