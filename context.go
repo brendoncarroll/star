@@ -86,12 +86,16 @@ func checkParams(valueMap map[Symbol][]any, flags, pos []IParam) error {
 // ParsePos parses positional arguments
 func ParsePos(dst map[Symbol][]any, params []IParam, args []string) (rest []string, err error) {
 	for _, param := range params {
-		val, rest, err := parseOnePos(param, args)
-		if err != nil {
-			return nil, err
+		// if the param is repeated, consume continuously, only if available
+		// if the param is not repeated, only enter loop once.
+		for i := 0; (i == 0 && !param.isRepeated()) || (param.isRepeated() && len(args) > 0); i++ {
+			val, rest, err := parseOnePos(param, args)
+			if err != nil {
+				return nil, err
+			}
+			dst[param.name()] = append(dst[param.name()], val)
+			args = rest
 		}
-		dst[param.name()] = append(dst[param.name()], val)
-		args = rest
 	}
 	return args, nil
 }

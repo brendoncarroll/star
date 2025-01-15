@@ -61,3 +61,65 @@ func TestParseFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePos(t *testing.T) {
+	type testCase struct {
+		Args []string
+		Pos  []IParam
+
+		Values map[Symbol][]any
+		Extra  []string
+	}
+	tcs := []testCase{
+		{
+			Args: []string{"1", "a", "b", "c"},
+			Pos: []IParam{
+				Param[string]{
+					Name:     "must-have",
+					Repeated: false,
+					Parse:    ParseString,
+				},
+				Param[string]{
+					Name:     "xs",
+					Repeated: true,
+					Parse:    ParseString,
+				},
+			},
+
+			Extra: nil,
+			Values: map[Symbol][]any{
+				"must-have": {"1"},
+				"xs":        {"a", "b", "c"},
+			},
+		},
+		{
+			Args: []string{"1"},
+			Pos: []IParam{
+				Param[string]{
+					Name:     "must-have",
+					Repeated: false,
+					Parse:    ParseString,
+				},
+				Param[string]{
+					Name:     "xs",
+					Repeated: true,
+					Parse:    ParseString,
+				},
+			},
+
+			Extra: nil,
+			Values: map[Symbol][]any{
+				"must-have": {"1"},
+			},
+		},
+	}
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			dst := make(map[Symbol][]any)
+			extra, err := ParsePos(dst, tc.Pos, tc.Args)
+			require.NoError(t, err)
+			assert.Equal(t, tc.Values, dst)
+			assert.Equal(t, tc.Extra, extra)
+		})
+	}
+}
