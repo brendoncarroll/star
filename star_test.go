@@ -112,6 +112,21 @@ func TestParsePos(t *testing.T) {
 				"must-have": {"1"},
 			},
 		},
+		{
+			Args: []string{},
+			Pos: []IParam{
+				Param[string]{
+					Name:     "has-default",
+					Default:  Ptr("default-value"),
+					Repeated: false,
+					Parse:    ParseString,
+				},
+			},
+			Extra: []string{},
+			Values: map[Symbol][]any{
+				"has-default": {"default-value"},
+			},
+		},
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
