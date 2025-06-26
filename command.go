@@ -93,7 +93,7 @@ func (p Param[T]) isRepeated() bool {
 	return p.Repeated
 }
 
-type IParam interface {
+type AnyParam interface {
 	isParam()
 	name() Symbol
 	parse(string) (any, error)
@@ -115,8 +115,8 @@ type Metadata struct {
 }
 
 type Command struct {
-	Flags []IParam
-	Pos   []IParam
+	Flags []AnyParam
+	Pos   []AnyParam
 	F     func(c Context) error
 	Metadata
 }

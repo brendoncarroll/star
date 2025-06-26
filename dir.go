@@ -11,7 +11,7 @@ import (
 
 func NewDir(md Metadata, children map[Symbol]Command) Command {
 	return Command{
-		Pos: []IParam{},
+		Pos: []AnyParam{},
 		F: func(ctx Context) error {
 			var childName string
 			var rest []string

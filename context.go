@@ -68,8 +68,8 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 	})
 }
 
-func checkParams(valueMap map[Symbol][]any, flags, pos []IParam) error {
-	for _, params := range [][]IParam{flags, pos} {
+func checkParams(valueMap map[Symbol][]any, flags, pos []AnyParam) error {
+	for _, params := range [][]AnyParam{flags, pos} {
 		for _, param := range params {
 			vals := valueMap[param.name()]
 			if len(vals) < 1 && !param.isRepeated() {
@@ -84,7 +84,7 @@ func checkParams(valueMap map[Symbol][]any, flags, pos []IParam) error {
 }
 
 // ParsePos parses positional arguments
-func ParsePos(dst map[Symbol][]any, params []IParam, args []string) (rest []string, err error) {
+func ParsePos(dst map[Symbol][]any, params []AnyParam, args []string) (rest []string, err error) {
 	for _, param := range params {
 		switch {
 		case param.isRepeated():
@@ -124,7 +124,7 @@ func ParsePos(dst map[Symbol][]any, params []IParam, args []string) (rest []stri
 	return args, nil
 }
 
-func parseOnePos(p IParam, args []string) (vals any, rest []string, err error) {
+func parseOnePos(p AnyParam, args []string) (vals any, rest []string, err error) {
 	for i := 0; i < len(args); i++ {
 		if isFlag(args[i]) {
 			// ignore flags
@@ -149,8 +149,8 @@ func isFlag(x string) bool {
 
 // ParseFlags takes a slice of args, and parses paramaeters in the list of flags.
 // ParseFlags writes values to dst.
-func ParseFlags(dst map[Symbol][]any, flags []IParam, args []string) (rest []string, err error) {
-	flagIndex := make(map[Symbol]IParam)
+func ParseFlags(dst map[Symbol][]any, flags []AnyParam, args []string) (rest []string, err error) {
+	flagIndex := make(map[Symbol]AnyParam)
 	for _, flag := range flags {
 		flagIndex[flag.name()] = flag
 	}

@@ -12,7 +12,7 @@ import (
 func TestParseFlags(t *testing.T) {
 	type testCase struct {
 		Args  []string
-		Flags []IParam
+		Flags []AnyParam
 
 		Values map[Symbol][]any
 		Extra  []string
@@ -20,7 +20,7 @@ func TestParseFlags(t *testing.T) {
 	tcs := []testCase{
 		{
 			Args: []string{"--set-int", "117", "extra", "stuff"},
-			Flags: []IParam{
+			Flags: []AnyParam{
 				Param[int]{
 					Name:  "set-int",
 					Parse: strconv.Atoi,
@@ -38,7 +38,7 @@ func TestParseFlags(t *testing.T) {
 				"--set-ints", "9",
 				"damn", "she", "fine",
 			},
-			Flags: []IParam{
+			Flags: []AnyParam{
 				Param[int]{
 					Name:     "set-ints",
 					Repeated: true,
@@ -65,7 +65,7 @@ func TestParseFlags(t *testing.T) {
 func TestParsePos(t *testing.T) {
 	type testCase struct {
 		Args []string
-		Pos  []IParam
+		Pos  []AnyParam
 
 		Values map[Symbol][]any
 		Extra  []string
@@ -73,7 +73,7 @@ func TestParsePos(t *testing.T) {
 	tcs := []testCase{
 		{
 			Args: []string{"1", "a", "b", "c"},
-			Pos: []IParam{
+			Pos: []AnyParam{
 				Param[string]{
 					Name:     "must-have",
 					Repeated: false,
@@ -94,7 +94,7 @@ func TestParsePos(t *testing.T) {
 		},
 		{
 			Args: []string{"1"},
-			Pos: []IParam{
+			Pos: []AnyParam{
 				Param[string]{
 					Name:     "must-have",
 					Repeated: false,
@@ -114,7 +114,7 @@ func TestParsePos(t *testing.T) {
 		},
 		{
 			Args: []string{},
-			Pos: []IParam{
+			Pos: []AnyParam{
 				Param[string]{
 					Name:     "has-default",
 					Default:  Ptr("default-value"),
