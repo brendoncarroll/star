@@ -57,6 +57,7 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 	defer stderr.Flush()
 	return cmd.F(Context{
 		Context:  ctx,
+		Env:      env,
 		StdOut:   stdout,
 		StdIn:    stdin,
 		StdErr:   stderr,
