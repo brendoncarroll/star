@@ -1,7 +1,6 @@
 package star
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -20,9 +19,9 @@ import (
 func Main(c Command) {
 	calledAs := os.Args[0]
 	args := os.Args[1:]
-	stdin := bufio.NewReader(os.Stdin)
-	stdout := bufio.NewWriter(os.Stdout)
-	stderr := bufio.NewWriter(os.Stderr)
+	stdin := os.Stdin
+	stdout := os.Stdout
+	stderr := os.Stderr
 	env := OSEnv(strings.ToUpper(calledAs) + "_")
 
 	ctx := context.Background()

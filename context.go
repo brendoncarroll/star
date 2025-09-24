@@ -1,9 +1,9 @@
 package star
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -13,15 +13,16 @@ type Context struct {
 	context.Context
 	Params   map[Symbol][]any
 	Env      map[string]string
-	StdIn    *bufio.Reader
-	StdOut   *bufio.Writer
-	StdErr   *bufio.Writer
+	StdIn    io.Reader
+	StdOut   io.Writer
+	StdErr   io.Writer
 	CalledAs string
 	Extra    []string
 
 	self *Command
 }
 
+// Printf is a convenience function for writing to stdout.
 func (c Context) Printf(format string, a ...any) {
 	_, err := fmt.Fprintf(c.StdOut, format, a...)
 	if err != nil {
@@ -29,32 +30,22 @@ func (c Context) Printf(format string, a ...any) {
 	}
 }
 
-func (c Context) Param(x Symbol) (any, bool) {
-	if !c.self.HasParam(x) {
-		panic(fmt.Sprintf("Command does not take param %q", x))
-	}
-	v, exists := c.Params[x]
-	return v, exists
-}
-
-func Run(ctx context.Context, cmd Command, env map[string]string, calledAs string, args []string, stdin *bufio.Reader, stdout *bufio.Writer, stderr *bufio.Writer) error {
+func Run(ctx context.Context, cmd Command, env map[string]string, calledAs string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	params := make(map[Symbol][]any)
 	args, err := ParseFlags(params, cmd.Flags, args)
 	if err != nil {
-		stderr.WriteString(cmd.Doc(calledAs))
+		fmt.Fprint(stderr, cmd.Doc(calledAs))
 		return err
 	}
 	args, err = ParsePos(params, cmd.Pos, args)
 	if err != nil {
-		stderr.WriteString(cmd.Doc(calledAs))
+		fmt.Fprint(stderr, cmd.Doc(calledAs))
 		return err
 	}
 	if err := checkParams(params, cmd.Flags, cmd.Pos); err != nil {
-		stderr.WriteString(cmd.Doc(calledAs))
+		fmt.Fprint(stderr, cmd.Doc(calledAs))
 		return err
 	}
-	defer stdout.Flush()
-	defer stderr.Flush()
 	return cmd.F(Context{
 		Context:  ctx,
 		Env:      env,
@@ -69,51 +60,30 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 	})
 }
 
-func checkParams(valueMap map[Symbol][]any, flags, pos []AnyParam) error {
-	for _, params := range [][]AnyParam{flags, pos} {
-		for _, param := range params {
-			vals := valueMap[param.name()]
-			if len(vals) < 1 && !param.isRepeated() {
-				return fmt.Errorf("missing value for parameter %q", param.name())
-			}
-			if len(vals) > 1 && !param.isRepeated() {
-				return fmt.Errorf("multiple values provided for parameter %q", param.name())
-			}
+func checkParams(valueMap map[Symbol][]any, flags []Flag, pos []Positional) error {
+	var allParams []Parameter
+	for _, x := range flags {
+		allParams = append(allParams, x)
+	}
+	for _, x := range pos {
+		allParams = append(allParams, x)
+	}
+	for _, param := range allParams {
+		vals := valueMap[param.name()]
+		if len(vals) < param.minCount() {
+			return fmt.Errorf("missing value for parameter %q", param.name())
+		}
+		if len(vals) > param.maxCount() {
+			return fmt.Errorf("multiple values provided for parameter %q", param.name())
 		}
 	}
 	return nil
 }
 
 // ParsePos parses positional arguments
-func ParsePos(dst map[Symbol][]any, params []AnyParam, args []string) (rest []string, err error) {
+func ParsePos(dst map[Symbol][]any, params []Positional, args []string) (rest []string, err error) {
 	for _, param := range params {
-		switch {
-		case param.isRepeated():
-			// if the param is repeated, consume continuously, only if args are available
-			for len(args) > 0 {
-				val, rest, err := parseOnePos(param, args)
-				if err != nil {
-					return nil, err
-				}
-				dst[param.name()] = append(dst[param.name()], val)
-				args = rest
-			}
-		case param.hasDefault():
-			if len(args) > 0 {
-				val, rest, err := parseOnePos(param, args)
-				if err != nil {
-					return nil, err
-				}
-				dst[param.name()] = append(dst[param.name()], val)
-				args = rest
-			} else {
-				val, err := param.makeDefault()
-				if err != nil {
-					return nil, err
-				}
-				dst[param.name()] = append(dst[param.name()], val)
-			}
-		default:
+		for i := 0; i < param.maxCount() && len(args) > 0; i++ {
 			val, rest, err := parseOnePos(param, args)
 			if err != nil {
 				return nil, err
@@ -125,7 +95,7 @@ func ParsePos(dst map[Symbol][]any, params []AnyParam, args []string) (rest []st
 	return args, nil
 }
 
-func parseOnePos(p AnyParam, args []string) (vals any, rest []string, err error) {
+func parseOnePos(p Parameter, args []string) (vals any, rest []string, err error) {
 	for i := 0; i < len(args); i++ {
 		if isFlag(args[i]) {
 			// ignore flags
@@ -142,16 +112,23 @@ func parseOnePos(p AnyParam, args []string) (vals any, rest []string, err error)
 	return nil, args, fmt.Errorf("no args left to parse for positional argument %q", p.name())
 }
 
-const flagPrefix = "--"
+const (
+	flagPrefix      = "--"
+	shortFlagPrefix = "-"
+)
 
 func isFlag(x string) bool {
 	return strings.HasPrefix(x, flagPrefix)
 }
 
+func isShortFlag(x string) bool {
+	return strings.HasPrefix(x, "-") && len(x) == 2
+}
+
 // ParseFlags takes a slice of args, and parses paramaeters in the list of flags.
 // ParseFlags writes values to dst.
-func ParseFlags(dst map[Symbol][]any, flags []AnyParam, args []string) (rest []string, err error) {
-	flagIndex := make(map[Symbol]AnyParam)
+func ParseFlags(dst map[Symbol][]any, flags []Flag, args []string) (rest []string, err error) {
+	flagIndex := make(map[Symbol]Flag)
 	for _, flag := range flags {
 		flagIndex[flag.name()] = flag
 	}
@@ -180,15 +157,7 @@ func ParseFlags(dst map[Symbol][]any, flags []AnyParam, args []string) (rest []s
 	}
 
 	for name, param := range flagIndex {
-		if len(dst[name]) == 0 && !param.isRepeated() {
-			if param.hasDefault() {
-				val, err := param.makeDefault()
-				if err != nil {
-					return rest, err
-				}
-				dst[name] = append(dst[name], val)
-				return rest, nil
-			}
+		if len(dst[name]) < param.minCount() {
 			return nil, fmt.Errorf("missing flag %q", param.name())
 		}
 	}

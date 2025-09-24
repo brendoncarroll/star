@@ -10,7 +10,7 @@ func main() {
 	star.Main(rootCmd)
 }
 
-var idArg = star.Param[string]{
+var idArg = star.Required[string]{
 	Name:  "id",
 	Parse: star.ParseString,
 }
@@ -25,7 +25,7 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.S
 	},
 	"read": {
 		Metadata: star.Metadata{Short: "reads the value of an entity"},
-		Pos:      []star.AnyParam{idArg},
+		Pos:      []star.Positional{idArg},
 		F: func(ctx star.Context) error {
 			_, err := fmt.Fprintln(ctx.StdOut, "READ "+idArg.Load(ctx))
 			return err
@@ -33,7 +33,7 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.S
 	},
 	"update": {
 		Metadata: star.Metadata{Short: "update the value of an entity"},
-		Pos:      []star.AnyParam{idArg},
+		Pos:      []star.Positional{idArg},
 		F: func(ctx star.Context) error {
 			_, err := fmt.Fprintln(ctx.StdOut, "UPDATE "+idArg.Load(ctx))
 			return err
@@ -41,7 +41,7 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.S
 	},
 	"delete": {
 		Metadata: star.Metadata{Short: "delete an entity by id"},
-		Pos:      []star.AnyParam{idArg},
+		Pos:      []star.Positional{idArg},
 		F: func(ctx star.Context) error {
 			_, err := fmt.Fprintln(ctx.StdOut, "DELETE "+idArg.Load(ctx))
 			return err

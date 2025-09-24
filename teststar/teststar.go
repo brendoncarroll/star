@@ -1,7 +1,6 @@
 package teststar
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"strings"
@@ -23,6 +22,7 @@ func OutContainsString(t testing.TB, c *star.Command, args []string, expect stri
 	t.Helper()
 	stdout, _ := run(t, c, args)
 	if !strings.Contains(string(stdout), expect) {
+		t.Log(string(stdout))
 		t.Fatalf("output: %v does not contain: %v", stdout, expect)
 	}
 }
@@ -32,7 +32,7 @@ func run(t testing.TB, c *star.Command, args []string) (stdout []byte, stderr []
 	ctx := context.Background()
 	var inbuf, outbuf, errbuf bytes.Buffer
 	env := map[string]string{}
-	err := star.Run(ctx, *c, env, t.Name(), args, bufio.NewReader(&inbuf), bufio.NewWriter(&outbuf), bufio.NewWriter(&errbuf))
+	err := star.Run(ctx, *c, env, t.Name(), args, &inbuf, &outbuf, &errbuf)
 	require.NoError(t, err)
 	return outbuf.Bytes(), errbuf.Bytes()
 }

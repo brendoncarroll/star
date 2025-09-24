@@ -12,7 +12,7 @@ import (
 func TestParseFlags(t *testing.T) {
 	type testCase struct {
 		Args  []string
-		Flags []AnyParam
+		Flags []Flag
 
 		Values map[Symbol][]any
 		Extra  []string
@@ -20,8 +20,8 @@ func TestParseFlags(t *testing.T) {
 	tcs := []testCase{
 		{
 			Args: []string{"--set-int", "117", "extra", "stuff"},
-			Flags: []AnyParam{
-				Param[int]{
+			Flags: []Flag{
+				Required[int]{
 					Name:  "set-int",
 					Parse: strconv.Atoi,
 				},
@@ -38,17 +38,34 @@ func TestParseFlags(t *testing.T) {
 				"--set-ints", "9",
 				"damn", "she", "fine",
 			},
-			Flags: []AnyParam{
-				Param[int]{
-					Name:     "set-ints",
-					Repeated: true,
-					Parse:    strconv.Atoi,
+			Flags: []Flag{
+				Repeated[int]{
+					Name:  "set-ints",
+					Parse: strconv.Atoi,
 				},
 			},
 			Values: map[Symbol][]any{
 				"set-ints": {3, 6, 9},
 			},
 			Extra: []string{"damn", "she", "fine"},
+		},
+		{
+			Args: []string{
+				"--aa", "1",
+				"--cc", "3",
+			},
+			Flags: []Flag{
+				Required[int]{Name: "aa", Parse: strconv.Atoi},
+				Optional[int]{
+					Name:  "bb",
+					Parse: strconv.Atoi,
+				},
+				Required[int]{Name: "cc", Parse: strconv.Atoi},
+			},
+			Values: map[Symbol][]any{
+				"aa": []any{1},
+				"cc": []any{3},
+			},
 		},
 	}
 	for i, tc := range tcs {
@@ -65,7 +82,7 @@ func TestParseFlags(t *testing.T) {
 func TestParsePos(t *testing.T) {
 	type testCase struct {
 		Args []string
-		Pos  []AnyParam
+		Pos  []Positional
 
 		Values map[Symbol][]any
 		Extra  []string
@@ -73,16 +90,14 @@ func TestParsePos(t *testing.T) {
 	tcs := []testCase{
 		{
 			Args: []string{"1", "a", "b", "c"},
-			Pos: []AnyParam{
-				Param[string]{
-					Name:     "must-have",
-					Repeated: false,
-					Parse:    ParseString,
+			Pos: []Positional{
+				Required[string]{
+					Name:  "must-have",
+					Parse: ParseString,
 				},
-				Param[string]{
-					Name:     "xs",
-					Repeated: true,
-					Parse:    ParseString,
+				Repeated[string]{
+					Name:  "xs",
+					Parse: ParseString,
 				},
 			},
 
@@ -94,16 +109,14 @@ func TestParsePos(t *testing.T) {
 		},
 		{
 			Args: []string{"1"},
-			Pos: []AnyParam{
-				Param[string]{
-					Name:     "must-have",
-					Repeated: false,
-					Parse:    ParseString,
+			Pos: []Positional{
+				Required[string]{
+					Name:  "must-have",
+					Parse: ParseString,
 				},
-				Param[string]{
-					Name:     "xs",
-					Repeated: true,
-					Parse:    ParseString,
+				Repeated[string]{
+					Name:  "xs",
+					Parse: ParseString,
 				},
 			},
 
@@ -114,18 +127,14 @@ func TestParsePos(t *testing.T) {
 		},
 		{
 			Args: []string{},
-			Pos: []AnyParam{
-				Param[string]{
-					Name:     "has-default",
-					Default:  Ptr("default-value"),
-					Repeated: false,
-					Parse:    ParseString,
+			Pos: []Positional{
+				Optional[string]{
+					Name:  "optional",
+					Parse: ParseString,
 				},
 			},
-			Extra: []string{},
-			Values: map[Symbol][]any{
-				"has-default": {"default-value"},
-			},
+			Extra:  []string{},
+			Values: map[Symbol][]any{},
 		},
 	}
 	for i, tc := range tcs {
