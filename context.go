@@ -100,7 +100,7 @@ func parseOnePos(p Parameter, args []string) (vals any, rest []string, err error
 		if isFlag(args[i]) {
 			// ignore flags
 			rest = append(rest, args[i])
-			i += 2
+			i += 1
 			continue
 		}
 		val, err := p.parse(args[i])

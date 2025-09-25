@@ -47,4 +47,50 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.S
 			return err
 		},
 	},
+	"sub-dir-command": star.NewDir(
+		star.Metadata{Short: "directory command below the root"},
+		map[star.Symbol]star.Command{
+			"c1": {
+				Metadata: star.Metadata{Short: "command1"},
+				F: func(c star.Context) error {
+					fmt.Println("C1")
+					return nil
+				},
+			},
+			"c2": {
+				Metadata: star.Metadata{Short: "command1"},
+				F: func(c star.Context) error {
+					fmt.Println("C1")
+					return nil
+				},
+			},
+			"echo":     echoCmd,
+			"echo-pos": echoPosCmd,
+		},
+	),
 })
+
+var echoParam = star.Required[string]{
+	Name:  "param",
+	Parse: star.ParseString,
+}
+
+var echoPosCmd = star.Command{
+	Metadata: star.Metadata{Short: "echos back the args"},
+	Pos:      []star.Positional{echoParam},
+	F: func(c star.Context) error {
+		c.Printf("%s\n", echoParam.Load(c))
+		return nil
+	},
+}
+
+var echoCmd = star.Command{
+	Metadata: star.Metadata{Short: "echos back the args"},
+	F: func(c star.Context) error {
+		c.Printf("EXTRA")
+		for i, arg := range c.Extra {
+			c.Printf("%d %s\n", i, arg)
+		}
+		return nil
+	},
+}

@@ -23,7 +23,7 @@ func OutContainsString(t testing.TB, c *star.Command, args []string, expect stri
 	stdout, _ := run(t, c, args)
 	if !strings.Contains(string(stdout), expect) {
 		t.Log(string(stdout))
-		t.Fatalf("output: %v does not contain: %v", stdout, expect)
+		t.Fatalf("OUTPUT: ---\n%s\n---\ndoes not contain: ---\n%s\n", string(stdout), expect)
 	}
 }
 
