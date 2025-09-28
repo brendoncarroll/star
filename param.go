@@ -7,8 +7,8 @@ import (
 	"go.brendoncarroll.net/exp/slices2"
 )
 
-// Symbol is the name of a parameter
-type Symbol string
+// Name is the name of a parameter
+type Name string
 
 type Parser[T any] = func(string) (T, error)
 
@@ -20,7 +20,7 @@ type Parser[T any] = func(string) (T, error)
 type Parameter interface {
 	isParam()
 
-	name() Symbol
+	name() Name
 	parse(string) (any, error)
 	minCount() int
 	maxCount() int
@@ -43,16 +43,16 @@ type Flag interface {
 // Required is a required parameter
 // If it is not satisfied, then the command will error
 type Required[T any] struct {
-	Name  Symbol
+	Name  Name
 	Parse Parser[T]
 }
 
 func (p Required[T]) Load(c Context) T {
 	panicIfNotHas(p.Name, c)
-	return c.Params[p.Name][0].(T)
+	return c.Values[p.Name][0].(T)
 }
 
-func (p Required[T]) name() Symbol {
+func (p Required[T]) name() Name {
 	return p.Name
 }
 
@@ -62,7 +62,7 @@ func (p Required[T]) parse(x string) (any, error) {
 
 func (p Required[T]) isParam() {}
 
-func (p Required[T]) isSatisfied(m map[Symbol][]string) bool {
+func (p Required[T]) isSatisfied(m map[Name][]string) bool {
 	_, yes := m[p.Name]
 	return yes
 }
@@ -87,14 +87,14 @@ var _ Parameter = Optional[struct{}]{}
 
 // Optional is an optional parameter, it can be provided once, or not at all.
 type Optional[T any] struct {
-	Name  Symbol
+	Name  Name
 	Parse Parser[T]
 }
 
 // Load loads the value for an optional parameter
 func (opt Optional[T]) LoadOpt(c Context) (T, bool) {
 	panicIfNotHas(opt.Name, c)
-	vals := c.Params[opt.Name]
+	vals := c.Values[opt.Name]
 	if len(vals) == 0 {
 		var zero T
 		return zero, false
@@ -102,7 +102,7 @@ func (opt Optional[T]) LoadOpt(c Context) (T, bool) {
 	return vals[0].(T), true
 }
 
-func (opt Optional[T]) name() Symbol {
+func (opt Optional[T]) name() Name {
 	return opt.Name
 }
 
@@ -130,20 +130,20 @@ func (opt Optional[T]) isParam() {}
 
 // Repeated is a parameter that can be passed as a flag multiple times.
 type Repeated[T any] struct {
-	Name  Symbol
+	Name  Name
 	Parse Parser[T]
 	Min   int
 }
 
 func (r Repeated[T]) Load(c Context) []T {
 	panicIfNotHas(r.Name, c)
-	vals := c.Params[r.Name]
+	vals := c.Values[r.Name]
 	return slices2.Map(vals, func(x any) T {
 		return x.(T)
 	})
 }
 
-func (p Repeated[T]) name() Symbol {
+func (p Repeated[T]) name() Name {
 	return p.Name
 }
 
@@ -171,10 +171,10 @@ func (r Repeated[T]) isParam() {}
 
 // Boolean is a Parameter that either exists or doesn't
 type Boolean struct {
-	Name Symbol
+	Name Name
 }
 
-func panicIfNotHas(name Symbol, c Context) {
+func panicIfNotHas(name Name, c Context) {
 	if !c.self.HasParam(name) {
 		panic(fmt.Sprintf("Command does not take param %q", name))
 	}

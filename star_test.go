@@ -14,7 +14,7 @@ func TestParseFlags(t *testing.T) {
 		Args  []string
 		Flags []Flag
 
-		Values map[Symbol][]any
+		Values map[Name][]any
 		Extra  []string
 	}
 	tcs := []testCase{
@@ -26,7 +26,7 @@ func TestParseFlags(t *testing.T) {
 					Parse: strconv.Atoi,
 				},
 			},
-			Values: map[Symbol][]any{
+			Values: map[Name][]any{
 				"set-int": {117},
 			},
 			Extra: []string{"extra", "stuff"},
@@ -44,7 +44,7 @@ func TestParseFlags(t *testing.T) {
 					Parse: strconv.Atoi,
 				},
 			},
-			Values: map[Symbol][]any{
+			Values: map[Name][]any{
 				"set-ints": {3, 6, 9},
 			},
 			Extra: []string{"damn", "she", "fine"},
@@ -62,7 +62,7 @@ func TestParseFlags(t *testing.T) {
 				},
 				Required[int]{Name: "cc", Parse: strconv.Atoi},
 			},
-			Values: map[Symbol][]any{
+			Values: map[Name][]any{
 				"aa": []any{1},
 				"cc": []any{3},
 			},
@@ -70,7 +70,7 @@ func TestParseFlags(t *testing.T) {
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[Symbol][]any)
+			dst := make(map[Name][]any)
 			extra, err := ParseFlags(dst, tc.Flags, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)
@@ -84,7 +84,7 @@ func TestParsePos(t *testing.T) {
 		Args []string
 		Pos  []Positional
 
-		Values map[Symbol][]any
+		Values map[Name][]any
 		Extra  []string
 	}
 	tcs := []testCase{
@@ -102,7 +102,7 @@ func TestParsePos(t *testing.T) {
 			},
 
 			Extra: nil,
-			Values: map[Symbol][]any{
+			Values: map[Name][]any{
 				"must-have": {"1"},
 				"xs":        {"a", "b", "c"},
 			},
@@ -121,7 +121,7 @@ func TestParsePos(t *testing.T) {
 			},
 
 			Extra: nil,
-			Values: map[Symbol][]any{
+			Values: map[Name][]any{
 				"must-have": {"1"},
 			},
 		},
@@ -134,12 +134,12 @@ func TestParsePos(t *testing.T) {
 				},
 			},
 			Extra:  []string{},
-			Values: map[Symbol][]any{},
+			Values: map[Name][]any{},
 		},
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[Symbol][]any)
+			dst := make(map[Name][]any)
 			extra, err := ParsePos(dst, tc.Pos, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)

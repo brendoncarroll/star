@@ -18,7 +18,7 @@ type Command struct {
 	Metadata
 }
 
-func (c Command) HasParam(x Symbol) bool {
+func (c Command) HasParam(x Name) bool {
 	for i := range c.Pos {
 		if c.Pos[i].name() == x {
 			return true

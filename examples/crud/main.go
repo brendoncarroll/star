@@ -15,7 +15,7 @@ var idArg = star.Required[string]{
 	Parse: star.ParseString,
 }
 
-var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.Symbol]star.Command{
+var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.Name]star.Command{
 	"create": {
 		Metadata: star.Metadata{Short: "creates a new entity"},
 		F: func(ctx star.Context) error {
@@ -49,7 +49,7 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[star.S
 	},
 	"sub-dir-command": star.NewDir(
 		star.Metadata{Short: "directory command below the root"},
-		map[star.Symbol]star.Command{
+		map[star.Name]star.Command{
 			"c1": {
 				Metadata: star.Metadata{Short: "command1"},
 				F: func(c star.Context) error {

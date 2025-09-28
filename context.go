@@ -11,7 +11,8 @@ import (
 // It provides parsed parameters, input and output streams, and a go context.Context
 type Context struct {
 	context.Context
-	Params   map[Symbol][]any
+	// Values are parsed Values filling a Parameter by Name
+	Values   map[Name][]any
 	Env      map[string]string
 	StdIn    io.Reader
 	StdOut   io.Writer
@@ -31,7 +32,7 @@ func (c Context) Printf(format string, a ...any) {
 }
 
 func Run(ctx context.Context, cmd Command, env map[string]string, calledAs string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-	params := make(map[Symbol][]any)
+	params := make(map[Name][]any)
 	args, err := ParseFlags(params, cmd.Flags, args)
 	if err != nil {
 		fmt.Fprint(stderr, cmd.Doc(calledAs))
@@ -52,7 +53,7 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 		StdOut:   stdout,
 		StdIn:    stdin,
 		StdErr:   stderr,
-		Params:   params,
+		Values:   params,
 		Extra:    args,
 		CalledAs: calledAs,
 
@@ -60,7 +61,7 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 	})
 }
 
-func checkParams(valueMap map[Symbol][]any, flags []Flag, pos []Positional) error {
+func checkParams(valueMap map[Name][]any, flags []Flag, pos []Positional) error {
 	var allParams []Parameter
 	for _, x := range flags {
 		allParams = append(allParams, x)
@@ -81,7 +82,7 @@ func checkParams(valueMap map[Symbol][]any, flags []Flag, pos []Positional) erro
 }
 
 // ParsePos parses positional arguments
-func ParsePos(dst map[Symbol][]any, params []Positional, args []string) (rest []string, err error) {
+func ParsePos(dst map[Name][]any, params []Positional, args []string) (rest []string, err error) {
 	for _, param := range params {
 		for i := 0; i < param.maxCount() && len(args) > 0; i++ {
 			val, rest, err := parseOnePos(param, args)
@@ -127,8 +128,8 @@ func isShortFlag(x string) bool {
 
 // ParseFlags takes a slice of args, and parses paramaeters in the list of flags.
 // ParseFlags writes values to dst.
-func ParseFlags(dst map[Symbol][]any, flags []Flag, args []string) (rest []string, err error) {
-	flagIndex := make(map[Symbol]Flag)
+func ParseFlags(dst map[Name][]any, flags []Flag, args []string) (rest []string, err error) {
+	flagIndex := make(map[Name]Flag)
 	for _, flag := range flags {
 		flagIndex[flag.name()] = flag
 	}
@@ -136,7 +137,7 @@ func ParseFlags(dst map[Symbol][]any, flags []Flag, args []string) (rest []strin
 	for len(args) > 0 {
 		arg := args[0]
 		if k, yes := strings.CutPrefix(arg, flagPrefix); yes {
-			sym := Symbol(k)
+			sym := Name(k)
 			param := flagIndex[sym]
 			if _, exists := flagIndex[sym]; exists {
 				// TODO handle equals

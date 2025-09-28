@@ -9,7 +9,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewDir(md Metadata, children map[Symbol]Command) Command {
+func NewDir(md Metadata, children map[Name]Command) Command {
 	return Command{
 		Pos:   []Positional{},
 		Flags: []Flag{},
@@ -39,7 +39,7 @@ func NewDir(md Metadata, children map[Symbol]Command) Command {
 				ctx.Printf("\n")
 				return nil
 			}
-			child, ok := children[Symbol(childName)]
+			child, ok := children[Name(childName)]
 			if !ok {
 				return fmt.Errorf("no command found for %q", childName)
 			}
