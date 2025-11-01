@@ -12,13 +12,13 @@ type Metadata struct {
 }
 
 type Command struct {
-	Flags []Flag
+	Metadata
+	Flags map[string]Flag
 	Pos   []Positional
 	F     func(c Context) error
-	Metadata
 }
 
-func (c Command) HasParam(x Name) bool {
+func (c Command) HasParam(x ParamID) bool {
 	for i := range c.Pos {
 		if c.Pos[i].name() == x {
 			return true
@@ -38,13 +38,25 @@ func (c Command) Doc(calledAs string) string {
 	for _, pos := range c.Pos {
 		sb.WriteString(pos.usagePositional())
 	}
-	sb.WriteString("\nFLAGS:\n")
-	for _, flag := range c.Flags {
-		fmt.Fprintf(sb, "  --%-20s", flag.name())
-		sb.WriteString("  ")
-		sb.WriteString(flag.usageFlag())
-		sb.WriteString("\n")
+
+	sb.WriteString("\n\nPOSITIONAL:\n")
+	if len(c.Pos) == 0 {
+		sb.WriteString("  (this command does not accept any positional parameters)\n")
+	} else {
+		for _, pos := range c.Pos {
+			fmt.Fprintf(sb, "  %-10s\t%s\n", pos.name(), pos.getShortDoc())
+		}
 	}
+
+	sb.WriteString("\nFLAGS:\n")
+	if len(c.Flags) == 0 {
+		sb.WriteString("  (this command does not accept any parameters as flags)\n")
+	} else {
+		for key, flag := range c.Flags {
+			fmt.Fprintf(sb, "  --%-20s %s\n", key, flag.getShortDoc())
+		}
+	}
+	sb.WriteString("\n")
 	return sb.String()
 }
 

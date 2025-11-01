@@ -9,10 +9,10 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewDir(md Metadata, children map[Name]Command) Command {
+func NewDir(md Metadata, children map[string]Command) Command {
 	return Command{
 		Pos:   []Positional{},
-		Flags: []Flag{},
+		Flags: map[string]Flag{},
 		F: func(ctx Context) error {
 			var childName string
 			var rest []string
@@ -29,7 +29,8 @@ func NewDir(md Metadata, children map[Name]Command) Command {
 			if childName == "" {
 				keys := maps.Keys(children)
 				slices.Sort(keys)
-				ctx.Printf("%s\t%s\n\n", filepath.Base(ctx.CalledAs), md.Short)
+				ctx.Printf("%s\n\n", filepath.Base(ctx.CalledAs))
+				ctx.Printf("%s\n\n", md.Short)
 				ctx.Printf("COMMANDS:\n")
 				fmtStr := "  %-" + strconv.Itoa(maxLen(keys)) + "s  %s\n"
 				for _, k := range keys {
@@ -39,7 +40,7 @@ func NewDir(md Metadata, children map[Name]Command) Command {
 				ctx.Printf("\n")
 				return nil
 			}
-			child, ok := children[Name(childName)]
+			child, ok := children[childName]
 			if !ok {
 				return fmt.Errorf("no command found for %q", childName)
 			}

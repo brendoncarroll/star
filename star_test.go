@@ -12,21 +12,21 @@ import (
 func TestParseFlags(t *testing.T) {
 	type testCase struct {
 		Args  []string
-		Flags []Flag
+		Flags map[string]Flag
 
-		Values map[Name][]any
+		Values map[ParamID][]any
 		Extra  []string
 	}
 	tcs := []testCase{
 		{
 			Args: []string{"--set-int", "117", "extra", "stuff"},
-			Flags: []Flag{
-				Required[int]{
-					Name:  "set-int",
+			Flags: map[string]Flag{
+				"set-int": Required[int]{
+					ID:    "set-int",
 					Parse: strconv.Atoi,
 				},
 			},
-			Values: map[Name][]any{
+			Values: map[ParamID][]any{
 				"set-int": {117},
 			},
 			Extra: []string{"extra", "stuff"},
@@ -38,13 +38,13 @@ func TestParseFlags(t *testing.T) {
 				"--set-ints", "9",
 				"damn", "she", "fine",
 			},
-			Flags: []Flag{
-				Repeated[int]{
-					Name:  "set-ints",
+			Flags: map[string]Flag{
+				"set-ints": Repeated[int]{
+					ID:    "set-ints",
 					Parse: strconv.Atoi,
 				},
 			},
-			Values: map[Name][]any{
+			Values: map[ParamID][]any{
 				"set-ints": {3, 6, 9},
 			},
 			Extra: []string{"damn", "she", "fine"},
@@ -54,15 +54,15 @@ func TestParseFlags(t *testing.T) {
 				"--aa", "1",
 				"--cc", "3",
 			},
-			Flags: []Flag{
-				Required[int]{Name: "aa", Parse: strconv.Atoi},
-				Optional[int]{
-					Name:  "bb",
+			Flags: map[string]Flag{
+				"aa": Required[int]{ID: "aa", Parse: strconv.Atoi},
+				"bb": Optional[int]{
+					ID:    "bb",
 					Parse: strconv.Atoi,
 				},
-				Required[int]{Name: "cc", Parse: strconv.Atoi},
+				"cc": Required[int]{ID: "cc", Parse: strconv.Atoi},
 			},
-			Values: map[Name][]any{
+			Values: map[ParamID][]any{
 				"aa": []any{1},
 				"cc": []any{3},
 			},
@@ -70,7 +70,7 @@ func TestParseFlags(t *testing.T) {
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[Name][]any)
+			dst := make(map[ParamID][]any)
 			extra, err := ParseFlags(dst, tc.Flags, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)
@@ -84,7 +84,7 @@ func TestParsePos(t *testing.T) {
 		Args []string
 		Pos  []Positional
 
-		Values map[Name][]any
+		Values map[ParamID][]any
 		Extra  []string
 	}
 	tcs := []testCase{
@@ -92,17 +92,17 @@ func TestParsePos(t *testing.T) {
 			Args: []string{"1", "a", "b", "c"},
 			Pos: []Positional{
 				Required[string]{
-					Name:  "must-have",
+					ID:    "must-have",
 					Parse: ParseString,
 				},
 				Repeated[string]{
-					Name:  "xs",
+					ID:    "xs",
 					Parse: ParseString,
 				},
 			},
 
 			Extra: nil,
-			Values: map[Name][]any{
+			Values: map[ParamID][]any{
 				"must-have": {"1"},
 				"xs":        {"a", "b", "c"},
 			},
@@ -111,17 +111,17 @@ func TestParsePos(t *testing.T) {
 			Args: []string{"1"},
 			Pos: []Positional{
 				Required[string]{
-					Name:  "must-have",
+					ID:    "must-have",
 					Parse: ParseString,
 				},
 				Repeated[string]{
-					Name:  "xs",
+					ID:    "xs",
 					Parse: ParseString,
 				},
 			},
 
 			Extra: nil,
-			Values: map[Name][]any{
+			Values: map[ParamID][]any{
 				"must-have": {"1"},
 			},
 		},
@@ -129,17 +129,17 @@ func TestParsePos(t *testing.T) {
 			Args: []string{},
 			Pos: []Positional{
 				Optional[string]{
-					Name:  "optional",
+					ID:    "optional",
 					Parse: ParseString,
 				},
 			},
 			Extra:  []string{},
-			Values: map[Name][]any{},
+			Values: map[ParamID][]any{},
 		},
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[Name][]any)
+			dst := make(map[ParamID][]any)
 			extra, err := ParsePos(dst, tc.Pos, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)
