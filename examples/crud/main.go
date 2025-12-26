@@ -69,6 +69,31 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[string
 			"echo-pos": echoPosCmd,
 		},
 	),
+	"grouped-subc": star.NewGroupedDir(
+		star.Metadata{Short: "grouped directory command"},
+		[]star.Group{
+			{
+				Title: "Even Commands",
+				Commands: []string{
+					"c0",
+					"c2",
+				},
+			},
+			{
+				Title: "Odd Commands",
+				Commands: []string{
+					"c1",
+					"c3",
+				},
+			},
+		},
+		map[string]star.Command{
+			"c0": echoCmd,
+			"c1": echoCmd,
+			"c2": echoCmd,
+			"c3": echoCmd,
+		},
+	),
 })
 
 var echoParam = star.Required[string]{
@@ -89,7 +114,7 @@ var echoPosCmd = star.Command{
 var echoCmd = star.Command{
 	Metadata: star.Metadata{Short: "echos back the args"},
 	F: func(c star.Context) error {
-		c.Printf("EXTRA")
+		c.Printf("EXTRA:\n")
 		for i, arg := range c.Extra {
 			c.Printf("%d %s\n", i, arg)
 		}
