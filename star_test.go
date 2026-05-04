@@ -1,6 +1,7 @@
 package star
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -9,25 +10,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRunPanicsWithoutPosName(t *testing.T) {
+	cmd := Command{
+		Pos: []Positional{&Required[string]{Parse: ParseString}},
+		F: func(c Context) error {
+			return nil
+		},
+	}
+
+	require.PanicsWithValue(t, "positional parameter at index 0 must set non-empty PosName", func() {
+		_ = Run(context.Background(), cmd, map[string]string{}, "test", nil, nil, nil, nil)
+	})
+}
+
 func TestParseFlags(t *testing.T) {
 	type testCase struct {
 		Args  []string
 		Flags map[string]Flag
 
-		Values map[ParamID][]any
+		Values map[Parameter][]any
 		Extra  []string
 	}
+	setInt := &Required[int]{Parse: strconv.Atoi}
+	setInts := &Repeated[int]{Parse: strconv.Atoi}
+	aa := &Required[int]{Parse: strconv.Atoi}
+	bb := &Optional[int]{Parse: strconv.Atoi}
+	cc := &Required[int]{Parse: strconv.Atoi}
 	tcs := []testCase{
 		{
 			Args: []string{"--set-int", "117", "extra", "stuff"},
 			Flags: map[string]Flag{
-				"set-int": Required[int]{
-					ID:    "set-int",
-					Parse: strconv.Atoi,
-				},
+				"set-int": setInt,
 			},
-			Values: map[ParamID][]any{
-				"set-int": {117},
+			Values: map[Parameter][]any{
+				setInt: {117},
 			},
 			Extra: []string{"extra", "stuff"},
 		},
@@ -39,13 +55,10 @@ func TestParseFlags(t *testing.T) {
 				"damn", "she", "fine",
 			},
 			Flags: map[string]Flag{
-				"set-ints": Repeated[int]{
-					ID:    "set-ints",
-					Parse: strconv.Atoi,
-				},
+				"set-ints": setInts,
 			},
-			Values: map[ParamID][]any{
-				"set-ints": {3, 6, 9},
+			Values: map[Parameter][]any{
+				setInts: {3, 6, 9},
 			},
 			Extra: []string{"damn", "she", "fine"},
 		},
@@ -55,22 +68,19 @@ func TestParseFlags(t *testing.T) {
 				"--cc", "3",
 			},
 			Flags: map[string]Flag{
-				"aa": Required[int]{ID: "aa", Parse: strconv.Atoi},
-				"bb": Optional[int]{
-					ID:    "bb",
-					Parse: strconv.Atoi,
-				},
-				"cc": Required[int]{ID: "cc", Parse: strconv.Atoi},
+				"aa": aa,
+				"bb": bb,
+				"cc": cc,
 			},
-			Values: map[ParamID][]any{
-				"aa": []any{1},
-				"cc": []any{3},
+			Values: map[Parameter][]any{
+				aa: []any{1},
+				cc: []any{3},
 			},
 		},
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[ParamID][]any)
+			dst := make(map[Parameter][]any)
 			extra, err := ParseFlags(dst, tc.Flags, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)
@@ -84,62 +94,52 @@ func TestParsePos(t *testing.T) {
 		Args []string
 		Pos  []Positional
 
-		Values map[ParamID][]any
+		Values map[Parameter][]any
 		Extra  []string
 	}
+	mustHave := &Required[string]{PosName: "must-have", Parse: ParseString}
+	xs := &Repeated[string]{PosName: "xs", Parse: ParseString}
+	mustHave2 := &Required[string]{PosName: "must-have", Parse: ParseString}
+	xs2 := &Repeated[string]{PosName: "xs", Parse: ParseString}
+	optional := &Optional[string]{PosName: "optional", Parse: ParseString}
 	tcs := []testCase{
 		{
 			Args: []string{"1", "a", "b", "c"},
 			Pos: []Positional{
-				Required[string]{
-					ID:    "must-have",
-					Parse: ParseString,
-				},
-				Repeated[string]{
-					ID:    "xs",
-					Parse: ParseString,
-				},
+				mustHave,
+				xs,
 			},
 
 			Extra: nil,
-			Values: map[ParamID][]any{
-				"must-have": {"1"},
-				"xs":        {"a", "b", "c"},
+			Values: map[Parameter][]any{
+				mustHave: {"1"},
+				xs:       {"a", "b", "c"},
 			},
 		},
 		{
 			Args: []string{"1"},
 			Pos: []Positional{
-				Required[string]{
-					ID:    "must-have",
-					Parse: ParseString,
-				},
-				Repeated[string]{
-					ID:    "xs",
-					Parse: ParseString,
-				},
+				mustHave2,
+				xs2,
 			},
 
 			Extra: nil,
-			Values: map[ParamID][]any{
-				"must-have": {"1"},
+			Values: map[Parameter][]any{
+				mustHave2: {"1"},
 			},
 		},
 		{
 			Args: []string{},
 			Pos: []Positional{
-				Optional[string]{
-					ID:    "optional",
-					Parse: ParseString,
-				},
+				optional,
 			},
 			Extra:  []string{},
-			Values: map[ParamID][]any{},
+			Values: map[Parameter][]any{},
 		},
 	}
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			dst := make(map[ParamID][]any)
+			dst := make(map[Parameter][]any)
 			extra, err := ParsePos(dst, tc.Pos, tc.Args)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Values, dst)

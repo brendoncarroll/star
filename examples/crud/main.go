@@ -10,8 +10,8 @@ func main() {
 	star.Main(rootCmd)
 }
 
-var idArg = star.Required[string]{
-	ID:       "id",
+var idArg = &star.Required[string]{
+	PosName:  "id",
 	Parse:    star.ParseString,
 	ShortDoc: "the id of the entity",
 }
@@ -96,8 +96,8 @@ var rootCmd = star.NewDir(star.Metadata{Short: "an example CLI app"}, map[string
 	),
 })
 
-var echoParam = star.Required[string]{
-	ID:       "param",
+var echoParam = &star.Required[string]{
+	PosName:  "param",
 	Parse:    star.ParseString,
 	ShortDoc: "the value to echo back",
 }

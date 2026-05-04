@@ -18,14 +18,14 @@ type Command struct {
 	F     func(c Context) error
 }
 
-func (c Command) HasParam(x ParamID) bool {
+func (c Command) HasParam(x Parameter) bool {
 	for i := range c.Pos {
-		if c.Pos[i].name() == x {
+		if c.Pos[i] == x {
 			return true
 		}
 	}
 	for i := range c.Flags {
-		if c.Flags[i].name() == x {
+		if c.Flags[i] == x {
 			return true
 		}
 	}
@@ -35,16 +35,16 @@ func (c Command) HasParam(x ParamID) bool {
 func (c Command) Doc(calledAs string) string {
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "%s ", calledAs)
-	for _, pos := range c.Pos {
-		sb.WriteString(pos.usagePositional())
+	for i, pos := range c.Pos {
+		sb.WriteString(pos.usagePositional(positionalName(pos, i)))
 	}
 
 	sb.WriteString("\n\nPOSITIONAL:\n")
 	if len(c.Pos) == 0 {
 		sb.WriteString("  (this command does not accept any positional parameters)\n")
 	} else {
-		for _, pos := range c.Pos {
-			fmt.Fprintf(sb, "  %-10s\t%s\n", pos.name(), pos.getShortDoc())
+		for i, pos := range c.Pos {
+			fmt.Fprintf(sb, "  %-10s\t%s\n", positionalName(pos, i), pos.getShortDoc())
 		}
 	}
 
@@ -58,6 +58,15 @@ func (c Command) Doc(calledAs string) string {
 	}
 	sb.WriteString("\n")
 	return sb.String()
+}
+
+func positionalName(pos Positional, i int) string {
+	if x, ok := pos.(posNamer); ok {
+		if name := x.getPosName(); name != "" {
+			return name
+		}
+	}
+	return fmt.Sprintf("arg%d", i+1)
 }
 
 func pickLast[E any, S ~[]E](x S) E {

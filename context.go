@@ -11,8 +11,8 @@ import (
 // It provides parsed parameters, input and output streams, and a go context.Context
 type Context struct {
 	context.Context
-	// Values are parsed Values filling a Parameter by Name
-	Values   map[ParamID][]any
+	// Values are parsed values keyed by Parameter identity.
+	Values   map[Parameter][]any
 	Env      map[string]string
 	StdIn    io.Reader
 	StdOut   io.Writer
@@ -32,7 +32,9 @@ func (c Context) Printf(format string, a ...any) {
 }
 
 func Run(ctx context.Context, cmd Command, env map[string]string, calledAs string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-	params := make(map[ParamID][]any)
+	mustHavePosNames(cmd)
+
+	params := make(map[Parameter][]any)
 	args, err := ParseFlags(params, cmd.Flags, args)
 	if err != nil {
 		fmt.Fprint(stderr, cmd.Doc(calledAs))
@@ -61,7 +63,16 @@ func Run(ctx context.Context, cmd Command, env map[string]string, calledAs strin
 	})
 }
 
-func checkParams(valueMap map[ParamID][]any, flags map[string]Flag, pos []Positional) error {
+func mustHavePosNames(cmd Command) {
+	for i, pos := range cmd.Pos {
+		named, ok := pos.(posNamer)
+		if !ok || named.getPosName() == "" {
+			panic(fmt.Sprintf("positional parameter at index %d must set non-empty PosName", i))
+		}
+	}
+}
+
+func checkParams(valueMap map[Parameter][]any, flags map[string]Flag, pos []Positional) error {
 	var allParams []Parameter
 	for _, x := range flags {
 		allParams = append(allParams, x)
@@ -69,34 +80,47 @@ func checkParams(valueMap map[ParamID][]any, flags map[string]Flag, pos []Positi
 	for _, x := range pos {
 		allParams = append(allParams, x)
 	}
+	paramNames := makeParamNames(flags, pos)
 	for _, param := range allParams {
-		vals := valueMap[param.name()]
+		vals := valueMap[param]
 		if len(vals) < param.minCount() {
-			return fmt.Errorf("missing value for parameter %q", param.name())
+			return fmt.Errorf("missing value for parameter %q", paramNames[param])
 		}
 		if len(vals) > param.maxCount() {
-			return fmt.Errorf("multiple values provided for parameter %q", param.name())
+			return fmt.Errorf("multiple values provided for parameter %q", paramNames[param])
 		}
 	}
 	return nil
 }
 
+func makeParamNames(flags map[string]Flag, pos []Positional) map[Parameter]string {
+	ret := make(map[Parameter]string)
+	for flagName, param := range flags {
+		ret[param] = flagName
+	}
+	for i, param := range pos {
+		ret[param] = positionalName(param, i)
+	}
+	return ret
+}
+
 // ParsePos parses positional arguments
-func ParsePos(dst map[ParamID][]any, params []Positional, args []string) (rest []string, err error) {
-	for _, param := range params {
+func ParsePos(dst map[Parameter][]any, params []Positional, args []string) (rest []string, err error) {
+	for i, param := range params {
+		name := positionalName(param, i)
 		for i := 0; i < param.maxCount() && len(args) > 0; i++ {
-			val, rest, err := parseOnePos(param, args)
+			val, rest, err := parseOnePos(param, name, args)
 			if err != nil {
 				return nil, err
 			}
-			dst[param.name()] = append(dst[param.name()], val)
+			dst[param] = append(dst[param], val)
 			args = rest
 		}
 	}
 	return args, nil
 }
 
-func parseOnePos(p Parameter, args []string) (vals any, rest []string, err error) {
+func parseOnePos(p Parameter, name string, args []string) (vals any, rest []string, err error) {
 	for i := 0; i < len(args); i++ {
 		if isFlag(args[i]) {
 			// ignore flags
@@ -110,7 +134,7 @@ func parseOnePos(p Parameter, args []string) (vals any, rest []string, err error
 		}
 		return val, append(rest, args[i+1:]...), nil
 	}
-	return nil, args, fmt.Errorf("no args left to parse for positional argument %q", p.name())
+	return nil, args, fmt.Errorf("no args left to parse for positional argument %q", name)
 }
 
 const (
@@ -128,7 +152,7 @@ func isShortFlag(x string) bool {
 
 // ParseFlags takes a slice of args, and parses paramaeters in the list of flags.
 // ParseFlags writes values to dst.
-func ParseFlags(dst map[ParamID][]any, flags map[string]Flag, args []string) (rest []string, err error) {
+func ParseFlags(dst map[Parameter][]any, flags map[string]Flag, args []string) (rest []string, err error) {
 	flagIndex := make(map[string]Flag)
 	for k, flag := range flags {
 		flagIndex[k] = flag
@@ -146,8 +170,7 @@ func ParseFlags(dst map[ParamID][]any, flags map[string]Flag, args []string) (re
 				if err != nil {
 					return nil, err
 				}
-				name := param.name()
-				dst[name] = append(dst[name], v)
+				dst[param] = append(dst[param], v)
 				args = args[2:]
 				continue
 			}
@@ -156,10 +179,9 @@ func ParseFlags(dst map[ParamID][]any, flags map[string]Flag, args []string) (re
 		rest = append(rest, arg)
 	}
 
-	for _, param := range flagIndex {
-		name := param.name()
-		if len(dst[name]) < param.minCount() {
-			return nil, fmt.Errorf("missing flag %q", param.name())
+	for flagName, param := range flagIndex {
+		if len(dst[param]) < param.minCount() {
+			return nil, fmt.Errorf("missing flag %q", flagName)
 		}
 	}
 	return rest, nil
